@@ -10,8 +10,10 @@ public class MyItemProcessor implements ItemProcessor<Customer, Customer> {
 
 	@Override
 	public Customer process(Customer customer) throws Exception {
-		customer.setEmail(customer.getEmail().toLowerCase());
-		return customer;
+	    if (customer.getName().matches(".*\\d.*")) { 
+	        throw new InvalidCustomerException("Invalid Customer Name: " + customer.getName());
+	    }
+	    customer.setEmail(customer.getEmail().toLowerCase());
+	    return customer;
 	}
-
 }

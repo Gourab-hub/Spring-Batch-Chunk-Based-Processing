@@ -18,6 +18,7 @@ import org.springframework.batch.item.support.ListItemReader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import com.batch.chunk.entity.Customer;
@@ -41,15 +42,41 @@ public class BatchConfig {
 	@Autowired
 	private MyItemWriter myItemWriter;
 	
+	@Autowired
+	private MySkipListener mySkipListener;
 
 	@Bean
-	public Step step1() {
-		return stepBuilderFactory.get("step1").<Customer, Customer>chunk(2).reader(myItemReader)
-				.processor(myItemProcessor).writer(myItemWriter).build();
+	public Step step1(MySkipListener mySkipListener) {
+	    return stepBuilderFactory.get("step1")
+	            .<Customer, Customer>chunk(2)
+	            .reader(myItemReader)
+	            .processor(myItemProcessor)
+	            .writer(myItemWriter)
+	            .faultTolerant()
+	            .skip(InvalidCustomerException.class) 
+	            .skipLimit(3) 
+	            .listener(mySkipListener)
+	            .taskExecutor(taskExecutor())
+	            .throttleLimit(5)
+	            .build();
 	}
 
+
 	@Bean
-	public Job job() {
-		return jobBuilderFactory.get("job1").start(step1()).build();
+	public Job job(MySkipListener mySkipListener) { // Add Listener here
+	    return jobBuilderFactory.get("job1")
+	            .start(step1(mySkipListener)) // Pass Listener
+	            .build();
+	}
+	
+	@Bean
+	public ThreadPoolTaskExecutor taskExecutor() {
+	    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+	    executor.setCorePoolSize(5);  
+	    executor.setMaxPoolSize(10);  
+	    executor.setQueueCapacity(50); 
+	    executor.setThreadNamePrefix("batch-thread-");
+	    executor.initialize();
+	    return executor;
 	}
 }
